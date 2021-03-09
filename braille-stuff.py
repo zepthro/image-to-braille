@@ -4,7 +4,6 @@ asciiXDots = 2
 from PIL import Image
 import argparse
 import math
-import numpy as np
 
 # main source code I am replicating. Find here:
 # https://lachlanarthur.github.io/Braille-ASCII-Art/dist/index.js
@@ -17,48 +16,41 @@ def to_matrix(the_data, n):
     return [the_data[i:i+n] for i in range(0, len(the_data), n)]
 
 
-# requires rgb or rgba images
+# requires grayscale images
 # https://stackoverflow.com/questions/31572425/list-all-rgba-values-of-an-image-with-pil
 
 def image_data_to_braille(rgb_array):
     threshold = int(150)
     # The original author used subarrays in this function.
-    # I am taking a slightly different method, because the rbga values are in a
-    # tuple. hence why I do not need to get another subarray
-    # A GREAT READ
+    # I am taking a slightly different method than the original author, because the rgb_array is grayscale. 
+    # Hence, why I do not need to get another subarray
+    # A GREAT READ: https://en.wikipedia.org/wiki/Braille_Patterns
     # I did not know anything about braille until this project
-    # https://en.wikipedia.org/wiki/Braille_Patterns
-    if len(rgb_array) == 4 and len(rgb_array[0]) == 2:
-        dots = [rgb_array[0][0], rgb_array[1][0], rgb_array[2][0], rgb_array[0][1], rgb_array[1][1], rgb_array[2][1], rgb_array[3][0], rgb_array[3][1]]
-        # print(*dots)
-    else:
-        return str(chr(0x2800))
-    #     dots = dots
-    #         .map(([r, g, b, a]) => (r + g + b) / 3)
-    #         .map(grey => +(grey < threshold));
+    # The following line sets up the 4x2 array the wiki article mentions
+    dots = [rgb_array[0][0], rgb_array[1][0], rgb_array[2][0], rgb_array[0][1], rgb_array[1][1], rgb_array[2][1], rgb_array[3][0], rgb_array[3][1]]
+    # make the image a binary value for each gray scale value
+    # if you want an inverted image, you flip dots >= threshold to dots < threshold
+    # or simply not(...)
+    # or the bitwise not operator on the result
     for i in range(len(dots)):
         dots[i] = '1' if dots[i] >= threshold else '0'
     # now we do some more vodoo magic
     # actually quite clever technique of binary representation of braille
     # again, see https://en.wikipedia.org/wiki/Braille_Patterns
-    # braille starts at 0x2800 or 10240
+    # braille starts at hex(0x2800) or int(10240)
     dots.reverse()
-    # print(''.join(dots))
     return str(chr(0x2800 + int(''.join(dots),2)))
 
-    # return String.fromCharCode(10240 + parseInt(dots.reverse().join(''), 2));
-    # return ''
-
 def parse_image(image, asciiWidth):
-    # necessary to have both r,g,b for this particular algorithm
+    # necessary to have a gray scaled image. Can do this with a conversion
+    # or simply finding the average of (r,g,b) per pixel value
     rgb_pixels = image.convert('L')
-    # .getdata()
-    # print (list(rgb_pixels))
     width, height = rgb_pixels.size
     
     # new image height. Want to proportionately make the image fit the screen
+    # not sure the exact conversion calculation here.
     asciiHeight = math.ceil( asciiWidth * asciiXDots * ( height / width ) / asciiYDots )
-    # print (asciiHeight, asciiWidth)
+    # want equal number of asciiDots. i.e. 4x2 array
     width = asciiWidth * asciiXDots
     height = asciiHeight * asciiYDots
     rgb_pixels = rgb_pixels.resize((width,height)).getdata()
@@ -86,20 +78,9 @@ def parse_image(image, asciiWidth):
             # theoretical approach, but I recommend trial and error.
             # we want to get a subset of the image. We can easily use a package like numpy, but
             # relying on numpy makes the project dependencies huge.
-            # array_s = [sub[asciiXDots:asciiYDots] for sub in two_d_array[x:y+asciiYDots]]
-            # print(image_data_to_braille([sub[asciiXDots:asciiYDots] for sub in two_d_array[x:y+asciiYDots]]))
-            line_of_braille += image_data_to_braille(temp[y:min(y+asciiYDots,height),x:min(x+asciiXDots,width)])
-            # image_data_to_braille([sub[asciiXDots:asciiYDots] for sub in two_d_array[x:y+asciiYDots]])
-            # print(len(two_d_array[x:y+asciiYDots]))
-            # exit(1)
-            # print (two_d_array[x:y+asciiYDots])
-            # print([sub[asciiXDots:asciiYDots] for sub in two_d_array[x:y+asciiYDots]])
-            # exit(1)
-            # line_of_braille += image_data_to_braille([sub[asciiXDots:asciiYDots] for sub in two_d_array[x:y+asciiYDots]])
-            # line_of_braille += image_data_to_braille([sub[asciiXDots:asciiYDots] for sub in two_d_array[x:y+asciiYDots]])
+            line_of_braille += image_data_to_braille([sub[x:x+asciiXDots] for sub in two_d_array[y:y+asciiYDots]])
+
         finished_image.append(line_of_braille)
-        print(line_of_braille)
-    # print(finished_image)
     return finished_image
 
 if __name__ == '__main__':
@@ -126,6 +107,6 @@ if __name__ == '__main__':
         with Image.open(filename, 'r') as img:
             # default asciiWidth I found online. Aparently over 500 gets laggy
             new_img = parse_image(img, 100)
-            # print (new_img)
+            print (*new_img, sep='\n')
     except Exception as e:
         print('Exiting with exception', str(e))
